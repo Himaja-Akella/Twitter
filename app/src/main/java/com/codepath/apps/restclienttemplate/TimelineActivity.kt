@@ -1,8 +1,12 @@
 package com.codepath.apps.restclienttemplate
 
+import android.content.Intent
 import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
 import android.util.Log
+import android.view.Menu
+import android.view.MenuItem
+import android.widget.Toast
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import androidx.swiperefreshlayout.widget.SwipeRefreshLayout
@@ -13,29 +17,23 @@ import org.json.JSONException
 
 class TimelineActivity : AppCompatActivity() {
 
-    lateinit var client: TwitterClient
-
+    lateinit var  client: TwitterClient
     lateinit var rvTweets: RecyclerView
-
-    lateinit var adapter:TweetsAdapter
-
+    lateinit var adaptor: TweetsAdapter
     lateinit var swipeContainer: SwipeRefreshLayout
 
     val tweets = ArrayList<Tweet>()
-
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_timeline)
 
-        client = TwitterApplication.getRestClient(this)
+        client =TwitterApplication.getRestClient(this)
+        swipeContainer= findViewById(R.id.swipeContainer)
 
-        swipeContainer = findViewById(R.id.swipeContainer)
         swipeContainer.setOnRefreshListener {
-            Log.i(TAG, "Refreshing timeline")
-            populateHomeTimeline()
+            Log.i(TAG,"Refreshing the Timeline")
+            popularHomeTimeline()
         }
-
-        // Configure the refreshing colors
         swipeContainer.setColorSchemeResources(
             android.R.color.holo_blue_bright,
             android.R.color.holo_green_light,
@@ -43,36 +41,61 @@ class TimelineActivity : AppCompatActivity() {
             android.R.color.holo_red_light
         )
 
-        rvTweets = findViewById(R.id.rvTweets)
-        adapter = TweetsAdapter(tweets)
+        rvTweets=findViewById(R.id.rvTweets)
+        adaptor= TweetsAdapter(tweets)
 
-        rvTweets.layoutManager = LinearLayoutManager(this)
-        rvTweets.adapter = adapter
+        rvTweets.layoutManager=LinearLayoutManager(this)
+        rvTweets.adapter=adaptor
 
-        populateHomeTimeline()
+        popularHomeTimeline()
     }
 
-    fun populateHomeTimeline() {
-        client.getHomeTimeline(object : JsonHttpResponseHandler() {
+    override fun onCreateOptionsMenu(menu: Menu?): Boolean {
+        menuInflater.inflate(R.menu.menu_main,menu)
+        return true
+    }
+
+    override fun onOptionsItemSelected(item: MenuItem): Boolean {
+        if (item.itemId == R.id.compose){
+            val intent = Intent(this, ComposeActivity::class.java)
+            startActivityForResult(intent, REQUEST_CODE)
+        }
+        return super.onOptionsItemSelected(item)
+    }
+
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        if(resultCode== RESULT_OK && requestCode == REQUEST_CODE) {
+            val tweet= data?.getParcelableExtra("tweet") as Tweet
+            tweets.add(0,tweet)
+
+            //update adaptor
+            adaptor.notifyItemInserted(0)
+            rvTweets.smoothScrollToPosition(0)
+        }
+        super.onActivityResult(requestCode, resultCode, data)
+    }
+
+
+    fun popularHomeTimeline(){
+        client.getHomeTimeline(object :JsonHttpResponseHandler(){
 
             override fun onSuccess(statusCode: Int, headers: Headers, json: JSON) {
                 Log.i(TAG, "onSuccess! $json")
 
-                val jsonArray = json.jsonArray
+                val jsonArray=json?.jsonArray
 
                 try {
-                    // clear out our currently fetched tweets
-                    adapter.clear()
-                    val listOfNewTweetsRetrieved = Tweet.fromJsonArray(jsonArray)
-                    tweets.addAll(listOfNewTweetsRetrieved)
-                    adapter.notifyDataSetChanged()
+                    //clear  out our  currently fetched
+                    adaptor.clear()
+                    val listOfNewTweetsRetrived=Tweet.fromJsonArray(jsonArray)
+                    tweets.addAll(listOfNewTweetsRetrived)
+                    adaptor.notifyDataSetChanged()
                     // Now we call setRefreshing(false) to signal refresh has finished
                     swipeContainer.setRefreshing(false)
-                } catch (e: JSONException) {
-                    Log.e(TAG, "JSON Exception $e")
+                } catch (e: JSONException){
+                    Log.e(TAG, "Json Exception $e")
                 }
             }
-
             override fun onFailure(
                 statusCode: Int,
                 headers: Headers?,
@@ -85,8 +108,8 @@ class TimelineActivity : AppCompatActivity() {
 
         })
     }
-
-    companion object {
+    companion object{
         val TAG = "TimelineActivity"
+        val REQUEST_CODE=10
     }
 }
